@@ -1,0 +1,25 @@
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media
+
+# Environment variables
+.env
+.venv
+venv/
+ENV/
+env/
+
+# IDE/System
+.vscode/
+.DS_Store
+
+# Temporary old files
+old_backup/
+.next/
+models.txt

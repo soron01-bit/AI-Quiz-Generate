@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="card mx-auto mt-4" style="max-width: 450px;">
+    <h2 class="text-center text-gradient mb-4">Welcome Back</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form|crispy }}
+        <button type="submit" class="btn-primary-custom w-100 mt-3">Login</button>
+    </form>
+    <div class="text-center mt-3" style="color:var(--text-secondary); font-size:0.9rem;">
+        Don't have an account? <a href="{% url 'register' %}" style="color:var(--primary-color);">Sign Up Here</a>
+    </div>
+</div>
+{% endblock %}

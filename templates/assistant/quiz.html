@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 800px; margin: 0 auto; padding-bottom: 3rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h4 style="color:var(--text-secondary);">{{ quiz.title }}</h4>
+        <span id="progress-text" style="background: var(--glass-bg); padding: 0.4rem 1rem; border-radius: 20px; border: 1px solid var(--glass-border); font-size: 0.9rem;">
+            Question 1
+        </span>
+    </div>
+
+    <!-- Progress Bar -->
+    <div style="height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 10px; margin-bottom: 2rem; overflow: hidden;">
+        <div id="progress-bar" style="height: 100%; background: linear-gradient(to right, var(--primary-color), var(--secondary-color)); width: 0%; transition: width 0.4s;"></div>
+    </div>
+
+    <div class="card" id="quiz-container">
+        <!-- JS injects question here -->
+    </div>
+    
+    <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;" id="next-btn-container">
+        <!-- JS injects next button here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const quizData = JSON.parse('{{ quiz_json|escapejs }}');
+    const questions = quizData.questions;
+    let currentIndex = 0;
+    let score = 0;
+    let isAnswered = false;
+
+    const container = document.getElementById('quiz-container');
+    const nextBtnContainer = document.getElementById('next-btn-container');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+
+    function renderQuestion() {
+        isAnswered = false;
+        
+        // Update progress
+        const pct = ((currentIndex + 1) / questions.length) * 100;
+        progressBar.style.width = pct + "%";
+        progressText.innerText = "Question " + (currentIndex + 1) + " of " + questions.length;
+        
+        const q = questions[currentIndex];
+        
+        let html = '<h2 style="font-size: 1.5rem; margin-bottom: 1.5rem;">' + q.question + '</h2>';
+        html += '<div style="display: flex; flex-direction: column; gap: 1rem;">';
+        
+        q.options.forEach((opt, idx) => {
+            const letter = String.fromCharCode(65 + idx);
+            html += `
+                <button onclick="handleSelect(this, ${idx})" class="option-btn" style="display: flex; align-items: center; gap: 1rem; background: rgba(15, 23, 42, 0.6); border: 2px solid transparent; padding: 1rem; border-radius: 12px; color: var(--text-primary); text-align: left; cursor: pointer; transition: 0.2s;">
+                    <div style="width: 32px; height: 32px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; display: flex; justify-content: center; align-items: center; font-weight: bold;">${letter}</div>
+                    <div style="font-size: 1.1rem;">${opt}</div>
+                </button>
+            `;
+        });
+        
+        html += '</div>';
+        html += '<div id="explanation-box" style="display: none; margin-top: 2rem; padding: 1.5rem; background: rgba(99, 102, 241, 0.1); border-left: 4px solid var(--primary-color); border-radius: 0 8px 8px 0; animation: slideDown 0.4s ease-out;"></div>';
+        
+        container.innerHTML = html;
+        nextBtnContainer.innerHTML = '';
+    }
+
+    window.handleSelect = function(btnElement, idx) {
+        if (isAnswered) return;
+        isAnswered = true;
+        
+        const q = questions[currentIndex];
+        const isCorrect = (idx === q.correctAnswerIndex);
+        
+        if (isCorrect) score++;
+
+        const allButtons = container.querySelectorAll('.option-btn');
+        allButtons.forEach((btn, i) => {
+            btn.style.cursor = 'default';
+            if (i === q.correctAnswerIndex) {
+                btn.style.background = 'rgba(16, 185, 129, 0.15)';
+                btn.style.borderColor = '#10b981';
+                btn.children[0].style.background = '#10b981';
+            } else if (i === idx && !isCorrect) {
+                btn.style.background = 'rgba(239, 68, 68, 0.15)';
+                btn.style.borderColor = '#ef4444';
+                btn.children[0].style.background = '#ef4444';
+            } else {
+                btn.style.opacity = '0.7';
+            }
+        });
+
+        const expBox = document.getElementById('explanation-box');
+        expBox.innerHTML = '<div style="font-weight: bold; color: #818cf8; margin-bottom: 0.5rem; font-size: 0.9rem; text-transform: uppercase;">Explanation</div><p style="margin:0; color: var(--text-primary);">' + q.explanation + '</p>';
+        expBox.style.display = 'block';
+
+        nextBtnContainer.innerHTML = `
+            <button onclick="goNext()" class="btn-primary-custom">
+                ${currentIndex < questions.length - 1 ? 'Next Question' : 'See Final Score'}
+            </button>
+        `;
+    }
+
+    window.goNext = function() {
+        if (currentIndex < questions.length - 1) {
+            currentIndex++;
+            renderQuestion();
+        } else {
+            renderFinished();
+        }
+    }
+
+    function renderFinished() {
+        progressBar.style.width = "100%";
+        progressText.innerText = "Completed!";
+        
+        let msg = score === questions.length ? 'Perfect Score! Outstanding work.' : 
+                  score >= questions.length / 2 ? 'Good job! You have a solid grasp.' : 'Keep studying and try again!';
+
+        container.innerHTML = `
+            <div style="text-align: center; padding: 2rem 0;">
+                <h2>Quiz Complete!</h2>
+                <div style="width: 150px; height: 150px; background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 2rem auto; font-size: 3rem; font-weight: 700; position: relative; box-shadow: 0 10px 30px rgba(236, 72, 153, 0.3);">
+                    <div style="position: absolute; inset: 5px; background: var(--bg-color); border-radius: 50%; z-index: 0;"></div>
+                    <span style="position: relative; z-index: 1;">${score} / ${questions.length}</span>
+                </div>
+                <p style="font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 3rem;">${msg}</p>
+                <div style="display: flex; justify-content: center; gap: 1.5rem;">
+                    <a href="" class="btn-secondary-custom">Retake Quiz</a>
+                    <a href="/dashboard/" class="btn-primary-custom">Back to Dashboard</a>
+                </div>
+            </div>
+        `;
+        nextBtnContainer.innerHTML = '';
+    }
+
+    // Init
+    renderQuestion();
+</script>
+{% endblock %}

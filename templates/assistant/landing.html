@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="text-align:center; padding-top:4rem;">
+    <h1 class="text-gradient" style="font-size:clamp(2.5rem, 5vw, 4rem); font-weight:700; margin-bottom:1rem;">
+        Django Study Assistant
+    </h1>
+    <p style="color:var(--text-secondary); font-size:1.2rem; max-width:600px; margin:0 auto 3rem auto;">
+        Upload any PDF and our Python-powered AI will scan it instantly to generate interactive quizzes. No Firebase Required.
+    </p>
+    
+    <div>
+        <a href="{% url 'register' %}" class="btn-primary-custom" style="text-decoration:none; margin-right:1rem;">Get Started</a>
+        <a href="{% url 'login' %}" class="btn-secondary-custom" style="text-decoration:none;">Login</a>
+    </div>
+</div>
+{% endblock %}
