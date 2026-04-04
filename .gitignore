@@ -20,6 +20,7 @@ env/
 .DS_Store
 
 # Temporary old files
-old_backup/
 .next/
 models.txt
+node_modules/
+
