@@ -10,6 +10,15 @@ class DocumentUploadForm(forms.ModelForm):
             'pdf_file': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': '.pdf'})
         }
 
+
+class ImageUploadForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ['image_file']
+        widgets = {
+            'image_file': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*', 'capture': 'environment'})
+        }
+
 class RegisterForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}))
     confirm_password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}))

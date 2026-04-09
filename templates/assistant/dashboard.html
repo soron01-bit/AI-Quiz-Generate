@@ -6,23 +6,56 @@
     <div class="col-md-6 mb-4">
         <div class="card h-100">
             <h3 style="color:var(--primary-color);">Create New Quiz</h3>
-            <p style="color:var(--text-secondary);">Upload a PDF directly to our Python server to generate a new AI quiz.</p>
-            
-            <form method="post" enctype="multipart/form-data" id="upload-form">
-                {% csrf_token %}
-                <div style="border: 2px dashed rgba(99, 102, 241, 0.5); padding: 1.5rem; text-align: center; border-radius: 12px; margin-bottom: 1.5rem; background: rgba(99, 102, 241, 0.05);">
-                    {{ form|crispy }}
-                </div>
-                
-                <button type="submit" class="btn-primary-custom w-100" id="analyze-btn">
-                    Analyze & Create Quiz
-                </button>
-                
-                <div id="loadingIndicator" style="display: none; text-align: center; margin-top: 1.5rem; color: var(--secondary-color); font-weight: bold;">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                    Python is reading your PDF & Gemini is generating questions... Please wait!
-                </div>
-            </form>
+            <p style="color:var(--text-secondary);">Choose how you want to create a quiz: upload PDF, upload an image, or take a photo.</p>
+
+            <div style="display:grid; grid-template-columns:1fr; gap:1rem;">
+                <form method="post" enctype="multipart/form-data" id="upload-pdf-form">
+                    {% csrf_token %}
+                    <h5 style="margin-bottom:0.8rem; color:var(--text-main);">Option 1: PDF</h5>
+                    <div style="border: 2px dashed rgba(99, 102, 241, 0.5); padding: 1rem; text-align: center; border-radius: 12px; margin-bottom: 0.8rem; background: rgba(99, 102, 241, 0.05);">
+                        {{ form|crispy }}
+                    </div>
+
+                    <button type="submit" name="upload_pdf" value="1" class="btn-primary-custom w-100" id="analyze-pdf-btn">
+                        Analyze PDF & Create Quiz
+                    </button>
+
+                    <div id="pdfLoadingIndicator" style="display: none; text-align: center; margin-top: 0.8rem; color: var(--secondary-color); font-weight: bold;">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Reading your PDF and generating questions... Please wait!
+                    </div>
+                </form>
+
+                <form method="post" enctype="multipart/form-data" id="upload-image-form">
+                    {% csrf_token %}
+                    <h5 style="margin-bottom:0.8rem; color:var(--text-main);">Option 2: Page Photo (Camera or Gallery)</h5>
+                    <div style="border: 2px dashed rgba(16, 185, 129, 0.5); padding: 1rem; text-align: center; border-radius: 12px; margin-bottom: 0.8rem; background: rgba(16, 185, 129, 0.05);">
+                        {{ image_form|crispy }}
+                        <small style="color:var(--text-secondary); display:block; margin-top:0.5rem;">On mobile, this can open your camera directly.</small>
+
+                        <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; margin-top:0.8rem;">
+                            <button type="button" class="btn-secondary-custom" id="open-camera-btn" style="padding:0.45rem 0.9rem;">Open Camera</button>
+                            <button type="button" class="btn-primary-custom" id="capture-photo-btn" style="padding:0.45rem 0.9rem; display:none;">Capture Photo</button>
+                            <button type="button" class="btn-secondary-custom" id="close-camera-btn" style="padding:0.45rem 0.9rem; display:none;">Close Camera</button>
+                        </div>
+
+                        <div id="camera-error" style="display:none; margin-top:0.8rem; color:#fda4af; font-size:0.9rem;"></div>
+
+                        <video id="camera-preview" autoplay playsinline style="display:none; width:100%; margin-top:0.8rem; border-radius:10px; border:1px solid var(--glass-border);"></video>
+                        <canvas id="camera-canvas" style="display:none;"></canvas>
+                        <img id="captured-preview" alt="Captured preview" style="display:none; width:100%; margin-top:0.8rem; border-radius:10px; border:1px solid var(--glass-border);" />
+                    </div>
+
+                    <button type="submit" name="upload_image" value="1" class="btn-secondary-custom w-100" id="analyze-image-btn">
+                        Analyze Photo & Create Quiz
+                    </button>
+
+                    <div id="imageLoadingIndicator" style="display: none; text-align: center; margin-top: 0.8rem; color: var(--secondary-color); font-weight: bold;">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Scanning image text and generating questions... Please wait!
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -42,7 +75,7 @@
                     {% endfor %}
                 </ul>
             {% else %}
-                <p style="color:var(--text-secondary); text-align:center; padding-top:2rem;">No quizzes found. Upload a PDF first.</p>
+                <p style="color:var(--text-secondary); text-align:center; padding-top:2rem;">No quizzes found. Upload a PDF or image first.</p>
             {% endif %}
         </div>
     </div>
@@ -51,9 +84,121 @@
 
 {% block scripts %}
 <script>
-    document.getElementById('upload-form').addEventListener('submit', function() {
-        document.getElementById('analyze-btn').style.display = 'none';
-        document.getElementById('loadingIndicator').style.display = 'block';
+    document.getElementById('upload-pdf-form').addEventListener('submit', function() {
+        document.getElementById('analyze-pdf-btn').style.display = 'none';
+        document.getElementById('pdfLoadingIndicator').style.display = 'block';
+    });
+
+    const imageForm = document.getElementById('upload-image-form');
+    const imageInput = imageForm.querySelector('input[type="file"]');
+    const openCameraBtn = document.getElementById('open-camera-btn');
+    const capturePhotoBtn = document.getElementById('capture-photo-btn');
+    const closeCameraBtn = document.getElementById('close-camera-btn');
+    const cameraPreview = document.getElementById('camera-preview');
+    const cameraCanvas = document.getElementById('camera-canvas');
+    const capturedPreview = document.getElementById('captured-preview');
+    const cameraError = document.getElementById('camera-error');
+    let activeStream = null;
+
+    function setCameraError(message) {
+        if (!message) {
+            cameraError.style.display = 'none';
+            cameraError.textContent = '';
+            return;
+        }
+
+        cameraError.textContent = message;
+        cameraError.style.display = 'block';
+    }
+
+    function stopCamera() {
+        if (activeStream) {
+            activeStream.getTracks().forEach(track => track.stop());
+            activeStream = null;
+        }
+
+        cameraPreview.style.display = 'none';
+        capturePhotoBtn.style.display = 'none';
+        closeCameraBtn.style.display = 'none';
+        openCameraBtn.style.display = 'inline-block';
+    }
+
+    openCameraBtn.addEventListener('click', async function() {
+        setCameraError('');
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setCameraError('Camera not supported on this browser. Please use gallery upload.');
+            return;
+        }
+
+        try {
+            activeStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' } },
+                audio: false,
+            });
+
+            cameraPreview.srcObject = activeStream;
+            cameraPreview.style.display = 'block';
+            capturePhotoBtn.style.display = 'inline-block';
+            closeCameraBtn.style.display = 'inline-block';
+            openCameraBtn.style.display = 'none';
+        } catch (err) {
+            setCameraError('Could not open camera. Allow permission or use HTTPS/localhost.');
+        }
+    });
+
+    closeCameraBtn.addEventListener('click', function() {
+        stopCamera();
+    });
+
+    capturePhotoBtn.addEventListener('click', function() {
+        if (!activeStream) {
+            setCameraError('Camera is not active.');
+            return;
+        }
+
+        const width = cameraPreview.videoWidth || 1280;
+        const height = cameraPreview.videoHeight || 720;
+        cameraCanvas.width = width;
+        cameraCanvas.height = height;
+
+        const ctx = cameraCanvas.getContext('2d');
+        ctx.drawImage(cameraPreview, 0, 0, width, height);
+
+        cameraCanvas.toBlob(function(blob) {
+            if (!blob) {
+                setCameraError('Could not capture photo. Please try again.');
+                return;
+            }
+
+            const timestamp = Date.now();
+            const file = new File([blob], `camera-capture-${timestamp}.jpg`, { type: 'image/jpeg' });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            imageInput.files = dataTransfer.files;
+
+            capturedPreview.src = URL.createObjectURL(blob);
+            capturedPreview.style.display = 'block';
+
+            stopCamera();
+            setCameraError('Photo captured. Now click "Analyze Photo & Create Quiz".');
+        }, 'image/jpeg', 0.92);
+    });
+
+    imageForm.addEventListener('submit', function(event) {
+        if (!imageInput || imageInput.files.length === 0) {
+            event.preventDefault();
+            setCameraError('Please take a photo or choose an image first.');
+            return;
+        }
+
+        stopCamera();
+        document.getElementById('analyze-image-btn').style.display = 'none';
+        document.getElementById('imageLoadingIndicator').style.display = 'block';
+    });
+
+    window.addEventListener('beforeunload', function() {
+        stopCamera();
     });
 </script>
 {% endblock %}
